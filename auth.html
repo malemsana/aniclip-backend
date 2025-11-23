@@ -21,7 +21,7 @@
             const key = document.getElementById('key').value;
             // Simple check: Try to fetch admin endpoint
             try {
-                const res = await fetch(`${API_URL}/admin/verify`, { // We'll add this tiny endpoint
+                const res = await fetch(`${API_URL}admin/verify`, { // We'll add this tiny endpoint
                     headers: { 'Authorization': `Bearer ${key}` }
                 });
                 if(res.ok) {
