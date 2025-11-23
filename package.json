@@ -2,35 +2,21 @@
   "name": "aniclip-backend",
   "version": "1.0.0",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "axios": "^1.13.2",
+    "axios": "^1.7.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.6.1",
-    "express": "^4.21.2",
-    "pg": "^8.16.3",
-    "psql": "^0.0.1"
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "pg": "^8.11.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "description": "",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/malemsana/aniclip-backend.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/malemsana/aniclip-backend/issues"
-  },
-  "homepage": "https://github.com/malemsana/aniclip-backend#readme"
+    "nodemon": "^3.1.0"
+  }
 }
