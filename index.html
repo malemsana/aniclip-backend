@@ -121,22 +121,22 @@
         </div>
 
         <!-- 2. TABLE ACTIONS -->
-        <div class="flex flex-col sm:flex-row justify-between items-end sm:items-center mb-6 gap-4">
-            <div>
-                <h1 class="text-xl font-bold text-white">Library Content</h1>
-                <p class="text-slate-500 text-xs">Manage database entries.</p>
-            </div>
-            <div class="flex gap-3 w-full sm:w-auto">
-                <div class="relative flex-grow sm:flex-grow-0">
-                    <span class="material-symbols-rounded absolute left-3 top-2.5 text-slate-500">search</span>
-                    <input type="text" id="admin-search" onkeyup="handleAdminSearch()" placeholder="Search..." class="w-full sm:w-64 bg-slate-900 border border-slate-700 text-slate-200 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:border-blue-500 transition-colors text-sm">
-                </div>
-                <a href="edit.html" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors shadow-lg shadow-blue-600/20 whitespace-nowrap">
-                    <span class="material-symbols-rounded text-lg">add</span> Add
-                </a>
-            </div>
-        </div>
-
+ // 2. FETCH TABLE DATA (Admin Route)
+    try {
+        // ✅ FIX: Use '/admin/animes' and pass Authorization header
+        const res = await fetch(`${API_URL}/admin/animes?limit=200`, {
+            headers: { 'Authorization': `Bearer ${ADMIN_KEY}` }
+        });
+        
+        if (!res.ok) throw new Error("Table fetch failed");
+        
+        const data = await res.json();
+        cache = data; // Store for search
+        renderTable(data);
+    } catch(e) { 
+        console.error("Table error:", e); 
+        document.getElementById('admin-table-body').innerHTML = `<tr><td colspan="5" class="text-center py-10 text-red-500">Error loading data. Check API connection.</td></tr>`;
+    }
         <!-- 3. TABLE -->
         <div class="bg-slate-900 border border-white/5 rounded-xl overflow-hidden">
             <div class="overflow-x-auto">
@@ -158,124 +158,203 @@
         </div>
     </main>
 
-    <script>
+<script>
+        // ⚠️ PRODUCTION URL (Ensure this is correct for your deployment)
         const API_URL = 'https://aniclip-backend.onrender.com/api'; 
+        
         const ADMIN_KEY = localStorage.getItem('aniclip_admin_key');
+        
+        // Redirect if not logged in
         if(!ADMIN_KEY) window.location.href = 'auth.html';
 
-        let cache = [];
-        let statsData = {}; // Holds the raw API response
+        // State Management
+        let tableCache = [];
+        let statsData = {}; 
 
+        // --- 1. INITIAL LOAD ---
         window.onload = async () => {
-            // 1. Fetch & Render Stats
+            await Promise.all([loadStats(), loadTableData()]);
+        };
+
+        // --- 2. DATA FETCHERS ---
+
+        async function loadStats() {
             try {
-                const statRes = await fetch(`${API_URL}/admin/stats`, { headers: { 'Authorization': `Bearer ${ADMIN_KEY}` }});
-                if(statRes.ok) {
-                    statsData = await statRes.json();
+                // Fetches "Hybrid" stats (Live Logs + Total Counters)
+                const res = await fetch(`${API_URL}/admin/stats`, { 
+                    headers: { 'Authorization': `Bearer ${ADMIN_KEY}` }
+                });
+                
+                if(res.ok) {
+                    statsData = await res.json();
+                    
+                    // Set "Library Size" immediately (It's static)
                     document.getElementById('stat-series').innerText = statsData.total_series || 0;
                     
-                    // Initial State (All Time)
+                    // Set Defaults for dynamic cards (All Time)
                     setMetric('dl', 'all', 'All Time');
                     setMetric('viz', 'all', 'All Time');
                 }
             } catch(e) { console.error("Stats error:", e); }
+        }
 
-            // 2. Fetch & Render Table
+        async function loadTableData() {
+            const tbody = document.getElementById('admin-table-body');
             try {
-                const res = await fetch(`${API_URL}/animes?limit=200`);
-                cache = await res.json();
-                renderTable(cache);
-            } catch(e) { console.error("Table error:", e); }
-        };
+                // 🛠️ FIX: Now fetching from Admin API (No filtering, sorts by Newest)
+                const res = await fetch(`${API_URL}/admin/animes?limit=500`, { 
+                    headers: { 'Authorization': `Bearer ${ADMIN_KEY}` }
+                });
+                
+                if(!res.ok) throw new Error("Failed to fetch list");
 
-        // --- STATS DROPDOWN LOGIC ---
-        
-        function toggleDropdown(id) {
-            const menu = document.getElementById(id);
-            // Close others
-            ['menu-dl', 'menu-viz'].forEach(mId => {
-                if(mId !== id) document.getElementById(mId).classList.add('hidden');
-            });
-            menu.classList.toggle('hidden');
-        }
-
-        function setMetric(type, period, label) {
-            // type = 'dl' or 'viz'
-            // period = 'day', 'week', 'month', 'all'
-            const keyMap = {
-                'dl_day': 'dl_today', 'dl_week': 'dl_week', 'dl_month': 'dl_month', 'dl_all': 'total_downloads',
-                'viz_day': 'visits_today', 'viz_week': 'visits_week', 'viz_month': 'viz_month', 'viz_all': 'total_visits'
-            };
-
-            const dataKey = keyMap[`${type}_${period}`];
-            const valEl = document.getElementById(`val-${type}`);
-            
-            // 1. Update Label
-            document.getElementById(`label-${type}`).innerText = label;
-            document.getElementById(`menu-${type}`).classList.add('hidden');
-
-            // 2. Animate Number Swap
-            valEl.classList.add('opacity-0', 'translate-y-2');
-            
-            setTimeout(() => {
-                valEl.innerText = statsData[dataKey] || 0;
-                valEl.classList.remove('opacity-0', 'translate-y-2');
-            }, 150);
-        }
-
-        // Close dropdowns on click outside
-        document.addEventListener('click', (e) => {
-            if(!e.target.closest('.relative')) {
-                document.getElementById('menu-dl').classList.add('hidden');
-                document.getElementById('menu-viz').classList.add('hidden');
+                const data = await res.json();
+                tableCache = data; // Cache for search filtering
+                renderTable(data);
+                
+            } catch(e) { 
+                console.error(e); 
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-red-400">Connection Error. Check Console.</td></tr>`;
             }
-        });
+        }
 
-        // --- TABLE LOGIC (Same as before) ---
+        // --- 3. RENDER TABLE ---
         function renderTable(data) {
             const tbody = document.getElementById('admin-table-body');
             tbody.innerHTML = '';
-            if(data.length === 0) return tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-slate-500">Empty.</td></tr>`;
+            
+            if(data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-slate-500 italic">No series found.</td></tr>`;
+                return;
+            }
 
             data.forEach(anime => {
-                const status = anime.is_featured 
-                    ? `<span class="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2 py-1 rounded border border-emerald-500/20">FEATURED</span>`
-                    : `<span class="text-slate-600 text-[10px]">STD</span>`;
+                const editUrl = `edit.html?name=${encodeURIComponent(anime.name)}`;
+                
+                // Badges
+                const featuredBadge = anime.is_featured 
+                    ? `<span class="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold px-2 py-1 rounded border border-emerald-500/20">FEATURED</span>` 
+                    : `<span class="text-slate-600 text-[10px] font-bold uppercase tracking-wider opacity-50">Standard</span>`;
 
                 tbody.innerHTML += `
-                    <tr class="hover:bg-slate-800/30 border-b border-white/5 last:border-0">
-                        <td class="px-6 py-4 text-xs opacity-50 font-mono">#${anime.id}</td>
+                    <tr class="hover:bg-slate-800/30 transition-colors border-b border-slate-800/50 last:border-0 group">
+                        
+                        <!-- ID -->
+                        <td class="px-6 py-4 text-xs font-mono opacity-40">#${anime.id}</td>
+                        
+                        <!-- Title & Poster -->
                         <td class="px-6 py-4">
-                            <div class="flex items-center gap-3">
-                                <img src="${anime.poster_url}" class="w-8 h-8 rounded object-cover bg-slate-800">
-                                <span class="text-sm font-bold text-slate-200 truncate max-w-[150px]">${anime.title}</span>
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
+                                    <img src="${anime.poster_url}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" onerror="this.src='https://via.placeholder.com/50'">
+                                </div>
+                                <div>
+                                    <div class="font-bold text-slate-200 text-sm group-hover:text-blue-400 transition-colors">${anime.title || anime.name}</div>
+                                    <div class="text-[10px] text-slate-500 font-mono truncate max-w-[150px]">${anime.name}</div>
+                                </div>
                             </div>
                         </td>
-                        <td class="px-6 py-4 text-xs text-slate-400">
-                            <span class="text-emerald-400 font-bold">${anime.download_count}</span> DL / <span class="text-blue-400 font-bold">${anime.visit_count}</span> VIS
+                        
+                        <!-- Counts -->
+                        <td class="px-6 py-4 text-xs">
+                            <div class="flex gap-4">
+                                <div title="Downloads"><span class="text-slate-500">DL:</span> <span class="text-emerald-400 font-bold">${anime.download_count}</span></div>
+                                <div title="Visits"><span class="text-slate-500">Vis:</span> <span class="text-purple-400 font-bold">${anime.visit_count}</span></div>
+                            </div>
                         </td>
-                        <td class="px-6 py-4">${status}</td>
+                        
+                        <!-- Status -->
+                        <td class="px-6 py-4">${featuredBadge}</td>
+                        
+                        <!-- Actions -->
                         <td class="px-6 py-4 text-right">
-                            <a href="edit.html?name=${encodeURIComponent(anime.name)}" class="text-blue-400 hover:text-white mr-3 font-bold text-xs">EDIT</a>
-                            <button onclick="deleteAnime(${anime.id})" class="text-red-500 hover:text-white font-bold text-xs">DEL</button>
+                            <div class="flex justify-end gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                                <a href="${editUrl}" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white rounded transition-colors border border-slate-700 hover:border-blue-500"><span class="material-symbols-rounded text-sm">edit</span></a>
+                                <button onclick="deleteAnime(${anime.id})" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-red-600 text-slate-300 hover:text-white rounded transition-colors border border-slate-700 hover:border-red-500"><span class="material-symbols-rounded text-sm">delete</span></button>
+                            </div>
                         </td>
-                    </tr>`;
+                    </tr>
+                `;
             });
         }
 
-        async function deleteAnime(id) {
-            if(confirm("Delete Series?")) {
-                await fetch(`${API_URL}/admin/animes/${id}`, { method: 'DELETE', headers: {'Authorization': `Bearer ${ADMIN_KEY}`} });
-                window.location.reload();
-            }
-        }
+        // --- 4. ACTIONS ---
 
         function handleAdminSearch() {
             const q = document.getElementById('admin-search').value.toLowerCase();
-            renderTable(cache.filter(a => (a.title||'').toLowerCase().includes(q)));
+            const filtered = tableCache.filter(a => 
+                (a.title || '').toLowerCase().includes(q) || a.name.includes(q)
+            );
+            renderTable(filtered);
         }
 
-        function logout() { localStorage.removeItem('aniclip_admin_key'); window.location.href='auth.html'; }
+        async function deleteAnime(id) {
+            if(!confirm("⚠️ WARNING: Permanently delete this series and all clips?")) return;
+            
+            try {
+                await fetch(`${API_URL}/admin/animes/${id}`, { 
+                    method: 'DELETE', 
+                    headers: { 'Authorization': `Bearer ${ADMIN_KEY}` } 
+                });
+                // Refresh Data without reload
+                loadTableData(); 
+                loadStats(); 
+            } catch(e) { alert("Delete failed. Check connection."); }
+        }
+
+        function logout() { 
+            localStorage.removeItem('aniclip_admin_key'); 
+            window.location.href='auth.html'; 
+        }
+
+        // --- 5. UI INTERACTIONS (Dropdowns & Metrics) ---
+
+        window.toggleDropdown = function(id) {
+            const menu = document.getElementById(id);
+            // Close all others first
+            document.querySelectorAll('[id^="menu-"]').forEach(el => {
+                if(el.id !== id) el.classList.add('hidden');
+            });
+            menu.classList.toggle('hidden');
+        };
+
+        window.setMetric = function(type, period, label) {
+            // type: 'dl' | 'viz'
+            // period: 'day' | 'week' | 'month' | 'all'
+            
+            // Key mapping to match the SQL column aliases
+            const dataKeyMap = {
+                'dl_day': 'dl_today', 'dl_week': 'dl_week', 'dl_month': 'dl_month', 'dl_all': 'total_downloads',
+                'viz_day': 'visits_today', 'viz_week': 'visits_week', 'viz_month': 'visits_month', 'viz_all': 'total_visits'
+            };
+
+            const targetKey = dataKeyMap[`${type}_${period}`];
+            const valueElement = document.getElementById(`val-${type}`);
+            const labelElement = document.getElementById(`label-${type}`);
+            const menuElement = document.getElementById(`menu-${type}`);
+
+            // Update Label
+            labelElement.innerText = label;
+            menuElement.classList.add('hidden'); // Close menu
+
+            // Animate Number Change
+            valueElement.classList.add('opacity-0');
+            setTimeout(() => {
+                valueElement.innerText = statsData[targetKey] || 0;
+                valueElement.classList.remove('opacity-0');
+            }, 150);
+        };
+
+        // Global Click to Close Dropdowns
+        document.addEventListener('click', function(e) {
+            const isButton = e.target.closest('button[onclick^="toggleDropdown"]');
+            const isMenu = e.target.closest('[id^="menu-"]');
+            
+            if (!isButton && !isMenu) {
+                document.querySelectorAll('[id^="menu-"]').forEach(el => el.classList.add('hidden'));
+            }
+        });
+
     </script>
 </body>
 </html>
