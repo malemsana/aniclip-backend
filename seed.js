@@ -1,7 +1,7 @@
 const axios = require('axios'); // We need to install this: npm install axios
 
 // CONFIGURATION
-const API_URL = 'https://aniclip-backend.onrender.com/api/';
+const API_URL = 'https://aniclip-backend.onrender.com/api';
 const ADMIN_KEY = 'mysecretadminpassword'; // Must match your .env
 
 async function seedDatabase() {
